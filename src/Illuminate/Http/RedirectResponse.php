@@ -3,6 +3,7 @@
 namespace Illuminate\Http;
 
 use BadMethodCallException;
+use Illuminate\Support\MultiMessageBag;
 use Illuminate\Support\Str;
 use Illuminate\Support\MessageBag;
 use Illuminate\Support\ViewErrorBag;
@@ -130,19 +131,56 @@ class RedirectResponse extends BaseRedirectResponse
      */
     public function withErrors($provider, $key = 'default')
     {
-        $value = $this->parseErrors($provider);
+        return $this->withSessionMessages('errors', $provider, $key, ViewErrorBag::class);
+    }
 
-        $errors = $this->session->get('errors', new ViewErrorBag);
-
-        if (! $errors instanceof ViewErrorBag) {
-            $errors = new ViewErrorBag;
+    /**
+     * Flash a container of status messages to the session.
+     *
+     * @param  string $sessionKey
+     * @param  \Illuminate\Contracts\Support\MessageProvider|array|string $provider
+     * @param  string $key
+     * @param string $multiBagClass
+     * @return $this
+     */
+    public function withSessionMessages($sessionKey, $provider, $key = 'default', $multiBagClass = MultiMessageBag::class)
+    {
+        if($sessionKey == 'errors'){
+            $value = $this->parseErrors($provider);
+        } else {
+            $value = $this->parseSessionMessages($provider);
         }
 
-        $this->session->flash(
-            'errors', $errors->put($key, $value)
-        );
+        $multiBag = $this->messagesFromSession($sessionKey, $multiBagClass);
+
+        $this->session->flash($sessionKey, $multiBag->put($key, $value));
 
         return $this;
+    }
+
+    protected function messagesFromSession($key, $viewBagClass = MultiMessageBag::class)
+    {
+        $statuses = $this->session->get($key, new $viewBagClass);
+
+        if (! $statuses instanceof $viewBagClass) {
+            $statuses = new $viewBagClass;
+        }
+        return $statuses;
+    }
+
+    /**
+     * Parse the given statuses into an appropriate value.
+     *
+     * @param  \Illuminate\Contracts\Support\MessageProvider|array|string $provider
+     * @return MessageBag
+     */
+    protected function parseSessionMessages($provider)
+    {
+        if ($provider instanceof MessageProvider) {
+            return $provider->getMessageBag();
+        }
+
+        return new MessageBag((array) $provider);
     }
 
     /**
@@ -153,11 +191,7 @@ class RedirectResponse extends BaseRedirectResponse
      */
     protected function parseErrors($provider)
     {
-        if ($provider instanceof MessageProvider) {
-            return $provider->getMessageBag();
-        }
-
-        return new MessageBag((array) $provider);
+        return $this->parseSessionMessages($provider);
     }
 
     /**

@@ -199,6 +199,25 @@ class View implements ArrayAccess, ViewContract
     }
 
     /**
+     * Add status messages to the view.
+     *
+     * @param string $key
+     * @param  \Illuminate\Contracts\Support\MessageProvider|array $provider
+     * @return $this
+     */
+    public function withStatuses($key, $provider)
+    {
+        if($key == 'errors'){
+            $provider = $this->formatErrors($provider);
+        } else {
+            $provider = $this->formatStatusMessages($provider);
+        }
+        $this->with($key, $provider);
+
+        return $this;
+    }
+
+    /**
      * Add validation errors to the view.
      *
      * @param  \Illuminate\Contracts\Support\MessageProvider|array  $provider
@@ -206,9 +225,21 @@ class View implements ArrayAccess, ViewContract
      */
     public function withErrors($provider)
     {
-        $this->with('errors', $this->formatErrors($provider));
+        $this->withStatuses('errors', $provider);
 
         return $this;
+    }
+
+    /**
+     * Format the given message provider into a MessageBag.
+     *
+     * @param  \Illuminate\Contracts\Support\MessageProvider|array $provider
+     * @return MessageBag
+     */
+    protected function formatStatusMessages($provider)
+    {
+        return $provider instanceof MessageProvider
+            ? $provider->getMessageBag() : new MessageBag((array) $provider);
     }
 
     /**
@@ -219,8 +250,7 @@ class View implements ArrayAccess, ViewContract
      */
     protected function formatErrors($provider)
     {
-        return $provider instanceof MessageProvider
-                        ? $provider->getMessageBag() : new MessageBag((array) $provider);
+        return $this->formatStatusMessages($provider);
     }
 
     /**
